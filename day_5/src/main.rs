@@ -1,11 +1,16 @@
+use std::{fmt::Display, vec};
+
 #[derive(Debug, Copy, Clone)]
 struct Crate(char);
 
-#[derive(Debug, Clone)]
-struct Stack(Vec<Crate>);
+impl Display for Crate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, Clone)]
-struct Ship(Vec<Stack>);
+struct Ship(Vec<Vec<Crate>>);
 
 impl From<&str> for Ship {
     fn from(input: &str) -> Self {
@@ -22,9 +27,7 @@ impl From<&str> for Ship {
             .filter(|(_idx, val)| matches!(val, '1'..='9'))
             .map(|(idx, _val)| idx)
             .collect::<Vec<usize>>();
-        let mut stacks: Vec<Stack> = vec![];
-        dbg!(&prelude);
-        dbg!(&idx_stack);
+        let mut stacks: Vec<Vec<Crate>> = vec![];
         for idx in idx_stack {
             let mut currstack = vec![];
             prelude.iter().for_each(|row| {
@@ -32,13 +35,39 @@ impl From<&str> for Ship {
                     currstack.push(row[idx])
                 }
             });
-            let currstack: Vec<Crate> = currstack.iter().map(|icrate| Crate(*icrate)).collect();
-            stacks.push(Stack(currstack));
+            let mut currstack: Vec<Crate> = currstack.iter().map(|icrate| Crate(*icrate)).collect();
+            currstack.reverse();
+            stacks.push(currstack);
         }
         Self(stacks)
     }
 }
 
+impl Ship {
+    fn execute_move(&mut self, mv: Move) {
+        for _ in 0..mv.amount {
+            let moved_crate = self.0[mv.src - 1].pop().unwrap();
+            self.0[mv.dest - 1].push(moved_crate);
+        }
+    }
+
+    fn execute_move_multiples(&mut self, mv: Move) {
+        let mut buffer = vec![];
+        for _ in 0..mv.amount {
+            buffer.push(self.0[mv.src - 1].pop().unwrap());
+        }
+        buffer.reverse();
+        self.0[mv.dest - 1].append(&mut buffer);
+    }
+
+    fn get_top_crates(&self) -> String {
+        let top_crates: Vec<Option<Crate>> =
+            self.0.iter().map(|istack| istack.last().copied()).collect();
+        format!("{:?}", top_crates)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 struct Move {
     amount: u8,
     src: usize,
@@ -54,12 +83,12 @@ impl From<&str> for Move {
             .parse::<u8>()
             .expect("Amount not a number?");
         let src = stream
-            .nth(3)
+            .nth(1)
             .unwrap()
             .parse::<usize>()
             .expect("src not a number?");
         let dest = stream
-            .nth(5)
+            .nth(1)
             .unwrap()
             .parse::<usize>()
             .expect("dest not a number?");
@@ -68,7 +97,15 @@ impl From<&str> for Move {
 }
 
 fn main() {
-    let content = include_str!("../input.test");
-    let ship = Ship::from(content);
-    dbg!(ship);
+    let content = include_str!("../input.prod");
+    let mut ship = Ship::from(content);
+    let moves: Vec<Move> = content
+        .lines()
+        .filter(|iline| iline.starts_with("move"))
+        .map(Move::from)
+        .collect();
+    moves
+        .iter()
+        .for_each(|imove| ship.execute_move_multiples(*imove));
+    println!("{}", ship.get_top_crates());
 }
